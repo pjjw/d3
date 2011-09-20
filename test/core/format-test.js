@@ -75,6 +75,7 @@ suite.addBatch({
       assert.strictEqual(f(0), "0");
       assert.strictEqual(f(1), "1");
       assert.strictEqual(f(100), "100");
+      assert.strictEqual(f(999.5), "1k");
       assert.strictEqual(f(1000), "1k");
       assert.strictEqual(f(145500000), "146M");
       assert.strictEqual(f(145999999.999999347), "146M");
