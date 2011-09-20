@@ -23,6 +23,7 @@ d3.format = function(specifier) {
     case "%": percentage = true; type = "f"; break;
     case "p": percentage = true; type = "r"; break;
     case "d": integer = true; precision = "0"; break;
+    case "s": precision = "3"; break;
   }
 
   type = d3_format_types[type] || d3_format_typeDefault;
@@ -68,6 +69,45 @@ var d3_format_types = {
   r: function(x, p) {
     var n = 1 + Math.floor(1e-15 + Math.log(x) / Math.LN10);
     return d3.round(x, p - n).toFixed(Math.max(0, Math.min(20, p - n)));
+  },
+  s: function(x, p) {
+    // copied whole-cloth from gnuplot
+    // find exponent and significand
+    var l10 = Math.log(x) / Math.LN10,
+        exponent = Math.floor(l10),
+        significand = Math.pow(10, l10 - exponent);
+    // round exponent to integer multiple of 3
+    var pr = exponent % 3;
+    // if (pr < 0) power -= 3;
+    // mantissa *= Math.pow(10, Math.abs(pr));
+    // power -= pr;
+    switch (pr) {
+    case -1:
+      exponent -= 3;
+    case 2:
+      significand *= 100;
+      break;
+    case -2:
+      exponent -= 3;
+    case 1:
+      significand *= 10;
+      break;
+    case 0:
+      break;
+    default:
+      // freak the fuck out
+      break;
+    }
+    exponent -= pr;
+    // decimal mantissa fixup
+    var tolerance = (Math.pow(10, -3) / 2);
+    if (significand + tolerance >= 1000) {
+      significand /= 1000;
+      exponent += 3;
+    }
+    var isoprefix = ['y','z','a','f','p','n','μ','m','','k','M','G','T','P','E','Z','Y'],
+        metricSuffix = (Math.abs(exponent) <= 24) ? isoprefix[(exponent + 24) / 3] : "e" + exponent;
+    return d3.round(significand,3) + metricSuffix;
   }
 };
 
