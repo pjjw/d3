@@ -10,6 +10,7 @@ d3.format = function(specifier) {
       type = match[9],
       percentage = false,
       integer = false,
+      trim_decimal_zero = false,
       si = false;
 
   if (precision) precision = precision.substring(1);
@@ -24,7 +25,8 @@ d3.format = function(specifier) {
     case "%": percentage = true; type = "f"; break;
     case "p": percentage = true; type = "r"; break;
     case "d": integer = true; precision = "0"; break;
-    case "s": si = true; type = "r"; precision = "3"; break;
+    case "s": si = true; trim_decimal_zero = true; 
+              type = "r"; precision = "3"; break;
   }
 
   type = d3_format_types[type] || d3_format_typeDefault;
@@ -32,10 +34,10 @@ d3.format = function(specifier) {
   return function(value) {
     var number = percentage ? value * 100 : +value,
         negative = (number < 0) && (number = -number) ? "\u2212" : sign;
-        exponent = si ? d3_format_getExponent(number, 3) : 0,
+        exponent = si ? d3_format_getExponent(number) : 0,
         scale = si ? Math.pow(10, -exponent) : 1,
         si_prefixes = ['y','z','a','f','p','n','μ','m','','k','M','G','T','P','E','Z','Y'],
-        suffix = percentage ? '%' : si ? (Math.abs(exponent) <= 24) ? si_prefixes[(exponent + 24) / 3] : "e" + exponent : '';
+        suffix = percentage ? '%' : si ? (Math.abs(exponent) < 27) ? si_prefixes[(exponent + 24) / 3] : "e" + exponent : '';
 
     // Return the empty string for floats formatted as ints.
     if (integer && (number % 1)) return "";
@@ -44,7 +46,7 @@ d3.format = function(specifier) {
     value = type(number * scale, precision);
 
     // if using SI prefix notation, scale and trim insignificant zeros
-    if (si) {
+    if (trim_decimal_zero) {
       value = (new Number(value)).toPrecision();
     }
 
@@ -78,7 +80,6 @@ var d3_format_types = {
   e: function(x, p) { return x.toExponential(p); },
   f: function(x, p) { return x.toFixed(p); },
   r: function(x, p) {
-    if (x == 0) return x.toPrecision(p);
     var n = 1 + Math.floor(1e-15 + Math.log(x) / Math.LN10);
     return d3.round(x, p - n).toFixed(Math.max(0, Math.min(20, p - n)));
   // },
@@ -107,21 +108,21 @@ var d3_format_types = {
   }
 };
 
-function d3_format_getExponent(value, mod) {
+function d3_format_getExponent(value) {
   if (value == 0) return 0;
   var l10 = Math.log(value) / Math.LN10,
       exponent = Math.floor(l10),
       mantissa = l10 - exponent;
       significand = Math.pow(10, mantissa),
-      em = exponent % mod;
+      em = exponent % 3;
     if (em < 0) exponent -= 3;
     exponent -= em;
-    // mantissa += (mod + em) % mod;
+    // equivalent to mantissa += (mod + em) % mod;
     significand *= Math.pow(10, (3 + em) % 3);
-    // decimal fixup
-    var tolerance = 1e-2;
-    if (significand + tolerance >= 1e3) exponent += mod;
-    // if (Math.pow(10, mantissa) + tolerance >= 1e3) exponent += mod;
+    // if rounding the sig up would bring it above 1e3, adjust the exponent
+    var tolerance = .5 + 1e-15;
+    if (significand + tolerance >= 1e3) exponent += 3;
+    // equivalent to if (Math.pow(10, mantissa) + tolerance >= 1e3) exponent += mod;
     return exponent;
 }
 
